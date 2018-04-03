@@ -124,10 +124,10 @@ function questionnaire_ajax_callback() {
   $number_of_items = variable_get('questionnaire_number_of_items', '1');
   $lifetime = variable_get('questionnaire_lifetime', '0');
 
-  $is_not_set_cookie = !isset($_COOKIE['questionnaire_ajax_callback']);
-  $has_no_value_cookie = $_COOKIE['questionnaire_ajax_callback'] != ip_address();
+//  $is_not_set_cookie = !isset($_COOKIE['questionnaire_ajax_callback']);
+//  $has_no_value_cookie = $_COOKIE['questionnaire_ajax_callback'] != ip_address();
 
-  if (rand(1, 100) <= $possibility && ($is_not_set_cookie || $has_no_value_cookie)) {
+  if (rand(1, 100) <= $possibility /*&& ($is_not_set_cookie || $has_no_value_cookie)*/) {
     $query = db_select('node', 'n')
       ->fields('n', array('nid'))
       ->condition('n.type', array_shift($content_type))
@@ -140,17 +140,15 @@ function questionnaire_ajax_callback() {
       $node = node_load($nid);
       $path = drupal_get_path_alias(empty($node->nid) ? $node->path : "node/$node->nid");
 
-      $data = array(
-        array(
+      $data[] = array(
           'name' => l($node->title, $path),
           'type' => 'success',
           'lifetime' => $lifetime,
-        ),
-      );
+        );
     }
 
-    $params = session_get_cookie_params();
-    setcookie('questionnaire_ajax_callback', ip_address(), REQUEST_TIME + 16 * 60 * 60, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+//    $params = session_get_cookie_params();
+//    setcookie('questionnaire_ajax_callback', ip_address(), REQUEST_TIME + 16 * 60 * 60, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
   }
 
   drupal_json_output($data);
