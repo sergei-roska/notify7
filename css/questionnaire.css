@@ -1,0 +1,8 @@
+.alertify-notifier .ajs-message.ajs-success {
+    background: #1a191891;
+    padding: 30px 0px 30px 30px;
+}
+.alertify-notifier .ajs-message.ajs-success a {
+    color: #ffffff;
+    text-decoration: none;
+}

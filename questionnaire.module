@@ -1,0 +1,157 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function questionnaire_menu() {
+  $items['admin/config/user-interface/questionnaire-interface'] = array(
+    'title' => t('Questionnaire center settings'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('questionnaire_settings_form'),
+    'access arguments' => array('administer site configuration'),
+    'file' => 'questionnaire.admin.inc',
+  );
+  $items['questionnaire/notify/ajax'] = array(
+    'title' => 'Questionnaire callback',
+    'page callback' => 'questionnaire_ajax_callback',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function questionnaire_block_info() {
+  $blocks = array();
+  $blocks['questionnaire_block'] = array(
+    'info' => t('Questionnaire block'),
+    'theme' => 'bnm_simple',
+    'status' => TRUE,
+    'region' => 'footer-right',
+    'weight' => 0,
+    'cache' => DRUPAL_NO_CACHE,
+    'visibility' => BLOCK_VISIBILITY_LISTED,
+    'pages' => '<front>'
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function questionnaire_theme() {
+  return array(
+    'questionnaire_alert_block' => array(
+      'file' => 'questionnaire.inc',
+      'variables' => array('title' => NULL, 'name' => NULL, 'description' => NULL),
+    ),
+  );
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function questionnaire_block_view($delta='') {
+  $block = array();
+  $variables = array(
+    'title' => 'title Foo',
+    'name' => 'name Foo',
+    'description' => 'description Foo',
+  );
+
+  switch ($delta) {
+    case 'questionnaire_block':
+      $block['content'] = array(
+        '#theme' => 'questionnaire_alert_block',
+        '#attached' => array(
+          'js' => array(
+            drupal_get_path('module', 'questionnaire') . '/js/questionnaire.js',
+            array(
+              'type' => 'setting',
+              'data' => array(
+                'title' => $variables['title'],
+                'name' => $variables['name'],
+                'description' => $variables['description'],
+              ),
+            ),
+          ),
+          'css' => array(
+            drupal_get_path('module', 'questionnaire') . '/css/questionnaire.css',
+          ),
+          'library' => array(
+            array('questionnaire', 'questionnaire'),
+          ),
+        ),
+      );
+      break;
+  }
+  return $block;
+}
+
+/**
+ * Implements hook_library().
+ */
+function questionnaire_library() {
+  $module_path = drupal_get_path('module', 'questionnaire');
+
+  $libraries['questionnaire'] = array(
+    'title' => t('Questionnaire'),
+    'website' => 'http://alertifyjs.com/',
+    'version' => '1.0',
+    'js' => array(
+      $module_path . '/lib/alertify.js' => array(),
+    ),
+    'css' => array(
+      $module_path . '/lib/alertify.css' => array(),
+    ),
+  );
+
+  return $libraries;
+}
+
+/**
+ * Return the date for a given format string via Ajax.
+ */
+function questionnaire_ajax_callback() {
+  global $language;
+  $data = array(array());
+  $content_type = variable_get('questionnaire_content_type', array('article'));
+  $possibility = variable_get('questionnaire_popup_possibility', '30');
+  $number_of_items = variable_get('questionnaire_number_of_items', '1');
+  $lifetime = variable_get('questionnaire_lifetime', '0');
+
+  $is_not_set_cookie = !isset($_COOKIE['questionnaire_ajax_callback']);
+  $has_no_value_cookie = $_COOKIE['questionnaire_ajax_callback'] != ip_address();
+
+  if (rand(1, 100) <= $possibility && ($is_not_set_cookie || $has_no_value_cookie)) {
+    $query = db_select('node', 'n')
+      ->fields('n', array('nid'))
+      ->condition('n.type', array_shift($content_type))
+      ->condition('n.language', array($language->language, LANGUAGE_NONE), 'IN')
+      ->range(0, $number_of_items)
+      ->orderRandom();
+    $nid_object = $query->execute()->fetchCol();
+
+    foreach ($nid_object as $key => $nid) {
+      $node = node_load($nid);
+      $path = drupal_get_path_alias(empty($node->nid) ? $node->path : "node/$node->nid");
+
+      $data = array(
+        array(
+          'name' => l($node->title, $path),
+          'type' => 'success',
+          'lifetime' => $lifetime,
+        ),
+      );
+    }
+
+    $params = session_get_cookie_params();
+    setcookie('questionnaire_ajax_callback', ip_address(), REQUEST_TIME + 16 * 60 * 60, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+  }
+
+  drupal_json_output($data);
+}

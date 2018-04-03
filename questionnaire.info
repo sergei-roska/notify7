@@ -1,0 +1,11 @@
+name = Questionnaire
+description = Provides possibility to ...hmm.
+core = 7.x
+version = 7.x.1
+package = BNM
+
+;files[] = questionnaire.module
+;files[] = questionnaire.inc
+;
+;stylesheets[all][] = css/questionnaire.css
+;scripts[] = js/questionnaire.js
