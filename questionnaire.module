@@ -118,27 +118,42 @@ function questionnaire_library() {
  */
 function questionnaire_ajax_callback() {
   global $language;
+  $nids = array();
   $data = array(array());
   $content_type = variable_get('questionnaire_content_type', array('article'));
   $possibility = variable_get('questionnaire_popup_possibility', '30');
   $number_of_items = variable_get('questionnaire_number_of_items', '1');
   $lifetime = variable_get('questionnaire_lifetime', '0');
 
-  $is_not_set_cookie = !isset($_COOKIE['questionnaire_ajax_callback']);
-  $has_no_value_cookie = $is_not_set_cookie ? TRUE : $_COOKIE['questionnaire_ajax_callback'] != ip_address();
+  if (isset($_COOKIE['questionnaire_ajax_callback']))
+    $nids = explode(',', $_COOKIE['questionnaire_ajax_callback']);
 
-  if (rand(1, 100) <= $possibility && ($is_not_set_cookie || $has_no_value_cookie)) {
+  $func = function($value) {
+    if (is_numeric($value))
+      return (int) $value;
+  };
+  $nids = array_filter(array_map($func, $nids));
+
+  if (rand(1, 100) <= $possibility) {
     $query = db_select('node', 'n')
       ->fields('n', array('nid'))
-      ->condition('n.type', array_shift($content_type))
-      ->condition('n.language', array($language->language, LANGUAGE_NONE), 'IN')
-      ->range(0, $number_of_items)
+      ->condition('n.type', $content_type)
+      ->condition('n.status', NODE_PUBLISHED)
+      ->condition('n.language', array($language->language, LANGUAGE_NONE), 'IN');
+    if (!empty($nids))
+      $query->condition('n.nid', $nids, 'NOT IN');
+    $query->range(0, $number_of_items)
       ->orderRandom();
     $nid_object = $query->execute()->fetchCol();
-
     foreach ($nid_object as $key => $nid) {
+      $nids[] = $nid;
       $node = node_load($nid);
-      $path = drupal_get_path_alias(empty($node->nid) ? $node->path : "node/$node->nid");
+      if (empty($node->field_social_link)) {
+        $path = drupal_get_path_alias(empty($node->nid) ? $node->path : "node/$node->nid");
+      }
+      else {
+        $path = $node->field_social_link[LANGUAGE_NONE][0]['value'];
+      }
 
       $data[] = array(
         'name' => l($node->title, $path),
@@ -148,7 +163,7 @@ function questionnaire_ajax_callback() {
     }
 
     $params = session_get_cookie_params();
-    setcookie('questionnaire_ajax_callback', ip_address(), REQUEST_TIME + 16 * 60 * 60, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+    setcookie('questionnaire_ajax_callback', implode(',', $nids), REQUEST_TIME + 3 * 24 * 60 * 60, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
   }
 
   drupal_json_output($data);
